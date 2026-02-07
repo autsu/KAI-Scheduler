@@ -29,6 +29,7 @@ import (
 	"github.com/NVIDIA/KAI-scheduler/pkg/scheduler/metrics"
 )
 
+// 调度入口
 func OpenSession(cache cache.Cache, config *conf.SchedulerConfiguration,
 	schedulerParams *conf.SchedulerParams, sessionId string, mux *http.ServeMux) (*Session, error) {
 	openSessionStart := time.Now()

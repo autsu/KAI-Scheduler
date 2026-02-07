@@ -69,7 +69,7 @@ func New(
 ) *k8sLister {
 	return &k8sLister{
 		podGroupLister: kubeAiSchedulerInformerFactory.Scheduling().V2alpha2().PodGroups().Lister(),
-		podInformer:    informerFactory.Core().V1().Pods().Informer(),
+		podInformer:    informerFactory.Core().V1().Pods().Informer(), // 调用 .Informer() 开启 listwatch for pod
 		podLister:      informerFactory.Core().V1().Pods().Lister(),
 		nodeLister:     informerFactory.Core().V1().Nodes().Lister(),
 		queueLister:    kubeAiSchedulerInformerFactory.Scheduling().V2().Queues().Lister(),

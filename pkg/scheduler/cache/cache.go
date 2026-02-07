@@ -156,7 +156,9 @@ func newSchedulerCache(schedulerCacheParams *SchedulerCacheParams) *SchedulerCac
 	}
 	sc.internalPlugins = k8splugins.InitializeInternalPlugins(sc.kubeClient, sc.informerFactory, sc.SnapshotSharedLister())
 
+	// listwatch for pod
 	sc.podLister = sc.informerFactory.Core().V1().Pods().Lister()
+	// listwatch for pg
 	sc.podGroupLister = sc.kubeAiSchedulerInformerFactory.Scheduling().V2alpha2().PodGroups().Lister()
 
 	if schedulerCacheParams.UsageDBClient != nil {

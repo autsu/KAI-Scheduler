@@ -53,6 +53,7 @@ type Session struct {
 
 	ClusterInfo *api.ClusterInfo
 
+	// 这里和 volcano 有点差别，为啥是 slice 而不是 map？
 	GpuOrderFns                           []api.GpuOrderFn
 	NodePreOrderFns                       []api.NodePreOrderFn
 	NodeOrderFns                          []api.NodeOrderFn

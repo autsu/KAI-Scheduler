@@ -109,6 +109,7 @@ func main() {
 	}
 	defer framework.CloseSession(ssn)
 
+	// 和 volcano 类似，也是 action + plugin 机制进行调度
 	actions, _ := conf_util.GetActionsFromConfig(snapshot.Config)
 	for _, action := range actions {
 		log.InfraLogger.SetAction(string(action.Name()))

@@ -100,16 +100,33 @@ func NewScheduler(
 	return scheduler, nil
 }
 
+// +GangSchedulingStep:1 调度器主入口 - 启动调度循环
+// Run 启动调度器的主循环，这是 Gang 调度的起点
+// 功能：
+// 1. 启动 Cache，监听 Kubernetes 资源变化（Pod、PodGroup、Node、Queue 等）
+// 2. 等待 Cache 同步完成，确保有完整的集群状态
+// 3. 启动定期调度循环，每个调度周期执行一次 runOnce
 func (s *Scheduler) Run(stopCh <-chan struct{}) {
+	// 启动 Cache，开始监听 K8s 资源
 	s.cache.Run(stopCh)
+
+	// 等待 Cache 同步完成，确保获取到所有 PodGroup、Pod、Node 等资源
 	s.cache.WaitForCacheSync(stopCh)
 
+	// 启动定期调度循环，默认每秒执行一次
 	go func() {
 		wait.Until(s.runOnce, s.schedulePeriod, stopCh)
 	}()
 }
 
+// +GangSchedulingStep:2 单次调度周期执行
+// runOnce 执行一次完整的调度周期，这是 Gang 调度的核心流程
+// 每个调度周期的流程：
+// 1. 打开 Session（获取集群快照）
+// 2. 依次执行 Actions（Allocate、Consolidate、Reclaim、Preempt、StaleGangEviction）
+// 3. 关闭 Session（清理资源）
 func (s *Scheduler) runOnce() {
+	// 生成唯一的 Session ID，用于日志追踪
 	sessionId := generateSessionID(6)
 	log.InfraLogger.SetSessionID(string(sessionId))
 
@@ -119,6 +136,11 @@ func (s *Scheduler) runOnce() {
 
 	defer metrics.UpdateE2eDuration(scheduleStartTime)
 
+	// +GangSchedulingStep:3 打开调度会话，获取集群快照
+	// OpenSession 会：
+	// 1. 从 Cache 获取集群快照（所有 PodGroup、Pod、Node、Queue 的当前状态）
+	// 2. 初始化插件（Proportion、Topology、GPU 等）
+	// 3. 注册插件的回调函数（用于 Gang 约束检查、资源分配等）
 	ssn, err := framework.OpenSession(s.cache, s.config, s.schedulerParams, sessionId, s.mux)
 	if err != nil {
 		log.InfraLogger.Errorf("Error while opening session, will try again next cycle. \nCause: %+v", err)
@@ -126,12 +148,22 @@ func (s *Scheduler) runOnce() {
 	}
 	defer framework.CloseSession(ssn)
 
+	// +GangSchedulingStep:4 执行调度 Actions
+	// Actions 执行顺序（Gang 调度主要在 Allocate Action 中）：
+	// 1. Allocate - 为待调度的 PodGroup 分配资源（Gang 调度的核心）
+	// 2. Consolidate - 整合已运行的工作负载，减少碎片
+	// 3. Reclaim - 回收超配额队列的资源
+	// 4. Preempt - 高优先级作业抢占低优先级作业
+	// 5. StaleGangEviction - 清理不满足 minMember 的 PodGroup
 	actions, _ := conf_util.GetActionsFromConfig(s.config)
 	for _, action := range actions {
 		log.InfraLogger.SetAction(string(action.Name()))
 		metrics.SetCurrentAction(string(action.Name()))
 		actionStartTime := time.Now()
+
+		// 执行 Action（Allocate Action 是 Gang 调度的入口）
 		action.Execute(ssn)
+
 		metrics.UpdateActionDuration(string(action.Name()), metrics.Duration(actionStartTime))
 	}
 	log.InfraLogger.RemoveActionLogger()
